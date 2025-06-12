@@ -453,6 +453,7 @@
           row["SORGULAMA_NOKTASI"] === "AYAR" || row["SORGULAMA_NOKTASI"] === "MONTAJ"
         );
 
+        // Stok haritası: SASI_KODU_3|PCB_KODU -> adet
         const stokMap = {};
         stokFiltered.forEach(row => {
           const kod = (row["SASI_KODU_3"] || "").toString();
@@ -462,25 +463,35 @@
           stokMap[key] = (stokMap[key] || 0) + adet;
         });
 
+        // Plan haritası: ilk 3 karakter (ör: 5BX) -> toplam adet
         const planMap = {};
         planJson.forEach(row => {
           const eBaslik = Object.keys(row)[4];
           if (eBaslik !== "SASI 110" && eBaslik !== "LIPS 140") return;
-
           const kod = (row[eBaslik] || "").toString().substring(0, 3);
           const adet = Number(row["PLAN"]) || 0;
           planMap[kod] = (planMap[kod] || 0) + adet;
         });
 
         const results = [];
+        const stokKodlar = new Set();
+
+        // Stokta olanlar için
         for (const key in stokMap) {
           const [kod, grup] = key.split("|");
-          const prefix = kod.substring(0, 3);
+          stokKodlar.add(kod);
           const stokAdet = stokMap[key];
-          const planAdet = planMap[prefix] || 0;
+          const planAdet = planMap[kod] || 0;
           const ihtiyac = Math.max(planAdet - stokAdet, 0);
           if (ihtiyac > 0) {
             results.push({ SASI_KODU: kod, PCB_KODU: grup, IHTIYAC: ihtiyac });
+          }
+        }
+
+        // Plan'da olup stokta olmayanlar için
+        for (const kod in planMap) {
+          if (!stokKodlar.has(kod)) {
+            results.push({ SASI_KODU: kod, PCB_KODU: "", IHTIYAC: planMap[kod] });
           }
         }
 
@@ -501,6 +512,32 @@
       };
       readerStok.readAsArrayBuffer(stokInput);
     }
+
+    // --- Dosya kutusunun tamamı tıklanabilir ve dosya isimleri görünsün ---
+    document.querySelectorAll('.file-input-wrapper').forEach(wrapper => {
+      wrapper.addEventListener('click', function (e) {
+        if (e.target.tagName !== 'INPUT') {
+          const input = wrapper.querySelector('input[type="file"]');
+          input && input.click();
+        }
+      });
+    });
+
+    function updateFileNames(input, placeholder) {
+      if (input.files.length > 0) {
+        const names = Array.from(input.files).map(f => f.name).join(', ');
+        placeholder.textContent = names;
+      } else {
+        placeholder.textContent = 'Dosya seçmek için tıklayın (.xlsx, .xls)';
+      }
+    }
+
+    document.querySelectorAll('.file-input-wrapper input[type="file"]').forEach(input => {
+      const placeholder = input.parentElement.querySelector('.file-placeholder');
+      input.addEventListener('change', function () {
+        updateFileNames(input, placeholder);
+      });
+    });
   </script>
 </body>
 
