@@ -323,97 +323,51 @@
         Object.entries(stoklar).forEach(([kod3, adet]) => {
           const ilgili = updated
             .map((r, i) => ({ ...r, _idx: i }))
-            .filter(r =>
-              toText(Object.values(r)[4]).startsWith(kod3) &&
-              Number(r["PLAN"]) > 0
-            );
+            .filter(r => toText(Object.values(r)[4]).startsWith(kod3) && Number(r["PLAN"]) > 0);
 
-          let aktifGunler = [];
-
-          // 1. adım: BUGUN satırlarını sırayla düş
-          for (let i = 0; i < ilgili.length; i++) {
-            const row = ilgili[i];
+          for (const row of ilgili) {
             const index = row._idx;
-            const gun = toText(row["GÜN"]);
-
-            if (gun === "BUGUN" || gun === "BUGÜN") {
-              const planAdet = Number(updated[index]["PLAN"]) || 0;
-              if (adet <= 0) break;
-              if (planAdet <= adet) {
-                adet -= planAdet;
-                updated[index]["PLAN"] = 0;
-              } else {
-                updated[index]["PLAN"] = planAdet - adet;
-                adet = 0;
-              }
-
-              // ilk bugun altındaki günü hatırla
-              if (aktifGunler.length === 0 && i + 1 < ilgili.length) {
-                const sonrakiGun = toText(ilgili[i + 1]["GÜN"]);
-                if (sonrakiGun && !["BUGUN", "BUGÜN"].includes(sonrakiGun)) {
-                  aktifGunler.push(sonrakiGun);
-                }
-              }
+            const planAdet = Number(updated[index]["PLAN"]) || 0;
+            if (adet <= 0) break;
+            if (planAdet <= adet) {
+              adet -= planAdet;
+              updated[index]["PLAN"] = 0;
+            } else {
+              updated[index]["PLAN"] = planAdet - adet;
+              adet = 0;
             }
-          }
-
-          // Zincirleme düşüm: sırayla takip eden günleri belleğe al
-          while (adet > 0 && aktifGunler.length > 0) {
-            const simdikiGun = aktifGunler[aktifGunler.length - 1];
-
-            let birSonrakiGun = null;
-
-            for (let i = 0; i < ilgili.length; i++) {
-              const row = ilgili[i];
-              const index = row._idx;
-              const gun = toText(row["GÜN"]);
-
-              if (gun === simdikiGun) {
-                const planAdet = Number(updated[index]["PLAN"]) || 0;
-                if (adet <= 0) break;
-                if (planAdet <= adet) {
-                  adet -= planAdet;
-                  updated[index]["PLAN"] = 0;
-                } else {
-                  updated[index]["PLAN"] = planAdet - adet;
-                  adet = 0;
-                }
-
-                if (!birSonrakiGun && i + 1 < ilgili.length) {
-                  const sonrakiGun = toText(ilgili[i + 1]["GÜN"]);
-                  if (
-                    sonrakiGun &&
-                    !aktifGunler.includes(sonrakiGun) &&
-                    !["BUGUN", "BUGÜN"].includes(sonrakiGun)
-                  ) {
-                    birSonrakiGun = sonrakiGun;
-                  }
-                }
-              }
-            }
-
-            if (birSonrakiGun) aktifGunler.push(birSonrakiGun);
-            else break;
           }
         });
 
-        const ws = XLSX.utils.json_to_sheet(updated, { cellStyles: true });
+        const header = Object.keys(updated[0]);
+        const aoa = [header];
+        updated.forEach(row => {
+          aoa.push(header.map(h => row[h]));
+        });
+
+        const ws = XLSX.utils.aoa_to_sheet(aoa);
         const range = XLSX.utils.decode_range(ws['!ref']);
-        for (let R = range.s.r + 1; R <= range.e.r; ++R) {
+
+        for (let R = range.s.r; R <= range.e.r; ++R) {
           for (let C = range.s.c; C <= range.e.c; ++C) {
             const cellRef = XLSX.utils.encode_cell({ r: R, c: C });
-            const cell = ws[cellRef] = ws[cellRef] || { t: 's', v: '' };
-            cell.s = {
-              font: { sz: 8 },
-              border: {
-                top: { style: "thin", color: { rgb: "000000" } },
-                bottom: { style: "thin", color: { rgb: "000000" } },
-                left: { style: "thin", color: { rgb: "000000" } },
-                right: { style: "thin", color: { rgb: "000000" } },
-              }
+            const cell = ws[cellRef];
+            if (!cell.s) cell.s = {};
+            cell.s.font = { sz: 8 }; // Font boyutu 8
+
+            cell.s.border = {
+              top: { style: "thin", color: { rgb: "000000" } },
+              bottom: { style: "thin", color: { rgb: "000000" } },
+              left: { style: "thin", color: { rgb: "000000" } },
+              right: { style: "thin", color: { rgb: "000000" } },
             };
-            if (C === 4) cell.s.fill = { fgColor: { rgb: "CCFFFF" } }; // Açık mavi - SASI
-            if (C === 9) cell.s.fill = { fgColor: { rgb: "CCFFCC" } }; // Açık yeşil - PLAN
+
+            if (C === 4) {
+              cell.s.fill = { fgColor: { rgb: "CCFFFF" } };
+            }
+            if (C === 9) {
+              cell.s.fill = { fgColor: { rgb: "CCFFCC" } };
+            }
           }
         }
 
@@ -422,5 +376,4 @@
         XLSX.writeFile(wbOut, "Guncel_PLAN.xlsx");
       });
     }
-
   </script>
