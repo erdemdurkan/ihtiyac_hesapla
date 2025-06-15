@@ -324,7 +324,7 @@
           const ilgili = updated
             .map((r, i) => ({ ...r, _idx: i }))
             .filter(r =>
-              toText(Object.values(r)[5]).startsWith(kod3) &&
+              toText(Object.values(r)[4]).startsWith(kod3) &&
               Number(r["PLAN"]) > 0
             );
 
