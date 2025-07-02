@@ -321,20 +321,70 @@
         const updated = planSheet.map(row => ({ ...row }));
 
         Object.entries(stoklar).forEach(([kod3, adet]) => {
-          const ilgili = updated
-            .map((r, i) => ({ ...r, _idx: i }))
-            .filter(r => toText(Object.values(r)[4]).startsWith(kod3) && Number(r["PLAN"]) > 0);
+          let kalanStok = adet;
+          if (kalanStok <= 0) return;
 
-          for (const row of ilgili) {
-            const index = row._idx;
-            const planAdet = Number(updated[index]["PLAN"]) || 0;
-            if (adet <= 0) break;
-            if (planAdet <= adet) {
-              adet -= planAdet;
-              updated[index]["PLAN"] = 0;
-            } else {
-              updated[index]["PLAN"] = planAdet - adet;
-              adet = 0;
+          // Gün öncelik sırasını belirle (GENEL - tüm Excel için)
+          const gunSirasi = ["BUGUN"]; // Her zaman BUGUN ile başla
+
+          // BUGUN'un altındaki günleri say
+          const bugunAltindakiGunler = {};
+          for (let i = 0; i < updated.length - 1; i++) { // -1 çünkü altındakine bakıyoruz
+            const mevcutGun = toText(Object.values(updated[i])[12]);
+            const altindakiGun = toText(Object.values(updated[i + 1])[12]);
+
+            if (mevcutGun === "BUGUN" && altindakiGun && altindakiGun !== "BUGUN") {
+              bugunAltindakiGunler[altindakiGun] = (bugunAltindakiGunler[altindakiGun] || 0) + 1;
+            }
+          }
+
+          // En çok olan günü bul
+          let enCokGun = "";
+          let enCokSayi = 0;
+          Object.entries(bugunAltindakiGunler).forEach(([gun, sayi]) => {
+            if (sayi > enCokSayi) {
+              enCokSayi = sayi;
+              enCokGun = gun;
+            }
+          });
+
+          if (enCokGun) {
+            gunSirasi.push(enCokGun);
+
+            // En çok günden sonraki günleri Excel sırasına göre ekle
+            let enCokGunBulundu = false;
+            for (let i = 0; i < updated.length; i++) {
+              const gun = toText(Object.values(updated[i])[12]);
+              if (gun === enCokGun && !enCokGunBulundu) {
+                enCokGunBulundu = true;
+              } else if (enCokGunBulundu && gun && gun !== "BUGUN" && gun !== enCokGun && !gunSirasi.includes(gun)) {
+                gunSirasi.push(gun);
+              }
+            }
+          }
+
+          // Belirlenen gün sırasına göre stok düş
+          for (const gun of gunSirasi) {
+            if (kalanStok <= 0) break;
+
+            // Bu gün için Excel'in en üstünden başla
+            for (let i = 0; i < updated.length; i++) {
+              if (kalanStok <= 0) break;
+
+              const row = updated[i];
+              const mamulKodu = toText(Object.values(row)[4]);
+              const satirGun = toText(Object.values(row)[12]);
+              const planAdet = Number(row["PLAN"]) || 0;
+
+              if (mamulKodu.startsWith(kod3) && satirGun === gun && planAdet > 0) {
+                if (planAdet <= kalanStok) {
+                  kalanStok -= planAdet;
+                  updated[i]["PLAN"] = 0;
+                } else {
+                  updated[i]["PLAN"] = planAdet - kalanStok;
+                  kalanStok = 0;
+                }
+              }
             }
           }
         });
@@ -377,3 +427,6 @@
       });
     }
   </script>
+</body>
+
+</html>
