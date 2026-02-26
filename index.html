@@ -313,7 +313,7 @@
           const nokta = toText(row["SORGULAMA_NOKTASI"]);
           if (nokta === "MONTAJ" || nokta === "AYAR") {
             const kod = toText(row["SASI_KODU_3"]);
-            const adet = Number(row["ADET"]) || 0;
+            const adet = Number(row["ADETLER"]) || 0;
             stoklar[kod] = (stoklar[kod] || 0) + adet;
           }
         });
